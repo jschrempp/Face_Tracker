@@ -1,0 +1,2 @@
+Holding place for Python code to recognize and track faces and send x,y coordinates of a face to the Arduino pan/tilt mechanism
+so that the mechanism tracks the center of the detected object (face).
