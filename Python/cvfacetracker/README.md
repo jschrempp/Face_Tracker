@@ -45,8 +45,9 @@ This will:
 - Press 'q' or ESC to quit
 
 To use a different camera (if you have multiple cameras):
+This example will use camera at index 1 and the serial port usbmodem101
 ```bash
-python face_tracker.py 1  # Use camera index 1 serial-port
+python face_tracker.py 1  /dev/cu.usbmodem101
 ```
 
 ## Project Structure
