@@ -1,2 +1,4 @@
-greeting = "Hello, World!"
+import cv2
+
+greeting = "** Hello, World! **"
 print(greeting)
