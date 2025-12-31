@@ -38,7 +38,7 @@
 
 ************************************************************************************/
 
-#define DEBUG   // for testing
+//#define DEBUG   // for testing
 
 #define ABSOLUTE_MODE // comment out for REALTIVE_MODE
 
@@ -52,7 +52,7 @@
 #define INITIAL_PAN_SERVO 90  // the initial position of the pan servo
 #define INITIAL_TILT_SERVO 90 // the initial position of the tilt servo
 
-const int HORIZ_PIXELS = 1280;  // camera matrix is 1280 x 720 (720p; 1Mpix)
+const int HORIZ_PIXELS = 320;  // camera matrix is 1280 x 720 (720p; 1Mpix)
 const float FOV = 50.0;         // the camera specified field of view (degrees)
 
 Servo servoTilt, servoPan;      // define the pan and tilt servo objects
@@ -66,7 +66,7 @@ int tiltServoPosition = INITIAL_TILT_SERVO;
 void setup() {
   
   pinMode(LED_PIN, OUTPUT);
-  Serial.begin(9600); // initialize the serial port
+  Serial.begin(115200); // initialize the serial port
 
   servoTilt.attach(TILT_SERVO_PIN);
   servoPan.attach(PAN_SERVO_PIN);
