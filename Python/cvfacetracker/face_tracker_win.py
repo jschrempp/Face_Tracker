@@ -65,14 +65,14 @@ class FaceTracker:
             return False
         
         # Set camera resolution
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 180)
         
         # Get actual frame dimensions
         self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
-        # Initialize serial port if specified
+        # Initialize serial port if specifiedqqq
         if self.serial_port:
             try:
                 self.ser = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
@@ -385,7 +385,7 @@ def main():
     # Parse command line arguments
     camera_index = 0
     serial_port = "COM5"  # Use the port that your Arduino is on
-    baud_rate = 9600
+    baud_rate = 115200
     
     if len(sys.argv) > 1:
         try:
