@@ -412,7 +412,7 @@ def main():
             print(f"Invalid baud rate: {sys.argv[3]}, using default (9600)")
     
     print("\nUsage: python face_tracker.py [camera_index] [serial_port] [baud_rate]")
-    print("Example: python face_tracker.py 1 /dev/cu.usbserial-0001 9600")
+    print("Example: python face_tracker.py 0 \"COM5\" 9600")
     print()
     
     # Create and run tracker
