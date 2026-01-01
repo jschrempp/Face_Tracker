@@ -221,6 +221,7 @@ class FaceTracker:
         try:
             message = f"{transformed_x},{transformed_y}\n"
             self.ser.write(message.encode())
+            time.sleep(0.2) # wait for servo to repond before sending new data
         except Exception as e:
             print(f"Serial write error: {e}")
     

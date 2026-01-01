@@ -40,7 +40,7 @@
 
 //#define DEBUG   // for testing
 
-#define ABSOLUTE_MODE // comment out for REALTIVE_MODE
+//#define ABSOLUTE_MODE // comment out for REALTIVE_MODE
 
 #include <Servo.h>  // the servo library
 #include <math.h>   // for math functions like round()
@@ -52,7 +52,7 @@
 #define INITIAL_PAN_SERVO 90  // the initial position of the pan servo
 #define INITIAL_TILT_SERVO 90 // the initial position of the tilt servo
 
-const int HORIZ_PIXELS = 320;  // camera matrix is 1280 x 720 (720p; 1Mpix)
+const int HORIZ_PIXELS = 320;  // camera matrix is 1280 x 720 (720p; 1Mpix), but the coordinates are based upon 320 x 180
 const float FOV = 50.0;         // the camera specified field of view (degrees)
 
 Servo servoTilt, servoPan;      // define the pan and tilt servo objects
