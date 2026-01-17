@@ -2,6 +2,9 @@
 """
 Face Tracking with OpenCV
 Captures video from the laptop camera and tracks faces in real-time.
+
+2026 01 16 removed listing of available cameras to reduce console clutter
+           added print of actual camera resolution after initialization
 """
 
 import cv2
@@ -71,8 +74,9 @@ class FaceTracker:
         # Get actual frame dimensions
         self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Camera initialized: {self.frame_width}x{self.frame_height}")
         
-        # Initialize serial port if specifiedqqq
+        # Initialize serial port if specified
         if self.serial_port:
             try:
                 self.ser = serial.Serial(self.serial_port, self.baud_rate, timeout=1)
@@ -83,7 +87,6 @@ class FaceTracker:
                 self.ser = None
         
         print("Face tracker initialized successfully!")
-        print(f"Camera resolution: {self.frame_width}x{self.frame_height}")
         return True
     
     def detect_faces(self, frame):
@@ -221,6 +224,7 @@ class FaceTracker:
         try:
             message = f"{transformed_x},{transformed_y}\n"
             self.ser.write(message.encode())
+            print(f"Sent to serial: {message.strip()}")
             time.sleep(0.2) # wait for servo to repond before sending new data
         except Exception as e:
             print(f"Serial write error: {e}")
@@ -380,8 +384,8 @@ def main():
     print("=" * 60)
     
     # List available cameras
-    available_cameras = list_available_cameras()
-    print(f"\nAvailable cameras: {available_cameras}")
+    # available_cameras = list_available_cameras()
+    # print(f"\nAvailable cameras: {available_cameras}")
     
     # Parse command line arguments
     camera_index = 0
@@ -394,12 +398,6 @@ def main():
             print(f"Using camera index: {camera_index}")
         except ValueError:
             print(f"Invalid camera index: {sys.argv[1]}, using default (0)")
-    else:
-        # If iPhone camera is at index 0, try to use laptop camera at index 1
-        if len(available_cameras) > 1:
-            print(f"\nMultiple cameras detected. Using index {camera_index}")
-            print(f"To use a different camera, run: python face_tracker.py <camera_index>")
-            print(f"Example: python face_tracker.py 1  (for laptop camera if iPhone is at 0)")
     
     if len(sys.argv) > 2:
         serial_port = sys.argv[2]
@@ -414,6 +412,7 @@ def main():
     
     print("\nUsage: python face_tracker.py [camera_index] [serial_port] [baud_rate]")
     print("Example: python face_tracker.py 0 \"COM5\" 9600")
+    print("Example: python face_tracker.py 1 \"/dev/cu.usbserial-0001\" 115200")
     print()
     
     # Create and run tracker
