@@ -34,11 +34,20 @@
       - const float FOV = 50.0;.  Set to the camera/sensor horizontal field of view (degrees).
 
     version 1.0, by Bob Glicksman, 12/26/25
+
+            1.1  * pulled operative code out of main into movePanTilt()
+                 * added #define CALIBRATE. When set, input values are directly passed to servos without manipulation
+                 * constants for PAN and TILT max/min so servos are not driven beyond the mechanism limits
+                 * TILT_SERVO_REVERSED when 1 then servo moves up with smaller numbers and down with larger ones
+                 * made FOV into two constants, horizontal and vertical for cameras with non-square views
+
+
     (c) 2025, 2026; Bob Glicksman, Jim Schrempp, Team Practical Projects.  All rights reserved.
 
 ************************************************************************************/
 
 //#define DEBUG   // for testing
+//#define CALIBRATE // if defined, then serial input is NOT scaled and passed directly to the servos
 
 //#define ABSOLUTE_MODE // comment out for REALTIVE_MODE
 
@@ -49,39 +58,124 @@
 #define PAN_SERVO_PIN 3   //The Pan servo is attached to pin 3
 #define LED_PIN 13
 
-#define INITIAL_PAN_SERVO 90  // the initial position of the pan servo
-#define INITIAL_TILT_SERVO 90 // the initial position of the tilt servo
+// These values constrain the servos so they do not move outside of the limits of the mechanism
+// Set to 0 and 180 if the servos can freely move to the limits of their travel
+#define PAN_SERVO_MINIMUM 0
+#define PAN_SERVO_MAXIMUM 180
+#define TILT_SERVO_MINIMUM 0
+#define TILT_SERVO_MAXIMUM 140
+
+#define TILT_SERVO_REVERSED 1   // set to 1 if tilt servo values decrease when the servo moves up
 
 const int HORIZ_PIXELS = 320;  // camera matrix is 1280 x 720 (720p; 1Mpix), but the coordinates are based upon 320 x 180
-const float FOV = 50.0;         // the camera specified field of view (degrees)
+const int VERT_PIXELS = 180;
+const float HORIZ_FOV = 50; //100.0;         // the camera specified field of view (degrees)
+const float VERT_FOV = 50; //70.0;         // the camera specified field of view (degrees)
 
 Servo servoTilt, servoPan;      // define the pan and tilt servo objects
 float degreesPerPixel;          // conversion factor of pixels into servo movement degrees
 
 // set the initial positions of the servos
 //    must calibrate the mechanism with the camera in ABSOLUTE mode; not totally necessary in RELATIVE mode.
-int panServoPosition = INITIAL_PAN_SERVO;
-int tiltServoPosition = INITIAL_TILT_SERVO;  
+int panServoMidPosition = PAN_SERVO_MINIMUM + (PAN_SERVO_MAXIMUM - PAN_SERVO_MINIMUM)/2;
+int tiltServoMidPosition = TILT_SERVO_MINIMUM + (TILT_SERVO_MAXIMUM - TILT_SERVO_MINIMUM)/2;
+int panServoPosition = panServoMidPosition; 
+int tiltServoPosition = tiltServoMidPosition; 
 
+// ********************************************
+// move the pan/tilt mechanism constrained to the limits of
+// the servos and the mechanism
+void movePanTilt(int newX, int newY){
+  int newPanServo, newTiltServo;  // the new positions to move the servos to
+
+  // convert the new X and Y image pixel values to servo angles
+  #ifdef ABSOLUTE_MODE
+    if (TILT_SERVO_REVERSED) {
+      newY = -newY;
+    }
+    float newXServo = map(newX, -HORIZ_PIXELS/2 , HORIZ_PIXELS/2, panServoMidPosition - HORIZ_FOV/2, panServoMidPosition + HORIZ_FOV/2 );
+    float newYServo = map(newY, -VERT_PIXELS/2, VERT_PIXELS/2, tiltServoMidPosition - VERT_FOV/2, tiltServoMidPosition + VERT_FOV/2) ;  
+
+  #else   // this would be RELATIVE mode
+    float newXServo = panServoPosition + (degreesPerPixel * newX);
+    float newYServo = tiltServoPosition - (degreesPerPixel * newY);
+
+  #endif
+
+  // the new servo positions
+  newPanServo = round(newXServo);
+  newTiltServo = round(newYServo);
+
+  // constrain the servo values to be withon 0 - 180 degrees
+  newPanServo = constrain(newPanServo, PAN_SERVO_MINIMUM, PAN_SERVO_MAXIMUM);
+  newTiltServo = constrain(newTiltServo, TILT_SERVO_MINIMUM, TILT_SERVO_MAXIMUM);
+
+  servoPan.write(newPanServo);
+  servoTilt.write(newTiltServo);
+
+  // reset the current servo states
+  panServoPosition = newPanServo;
+  tiltServoPosition = newTiltServo;
+
+  #ifdef DEBUG
+    Serial.print("pan servo position = ");
+    Serial.print(panServoPosition);
+    Serial.print(" ; tilt servo position = ");
+    Serial.print(tiltServoPosition);
+    Serial.println("\n");
+  #endif  
+
+
+}   // end of movePanTilt()
+
+
+// ********************************************
 void setup() {
   
   pinMode(LED_PIN, OUTPUT);
   Serial.begin(115200); // initialize the serial port
+  delay (2000); // allow time for serial port to initialize
 
   servoTilt.attach(TILT_SERVO_PIN);
   servoPan.attach(PAN_SERVO_PIN);
 
   //Initially position both servos to initial positions
-  servoTilt.write(tiltServoPosition);  
-  servoPan.write(panServoPosition);
+  movePanTilt(0,0);
+//  servoTilt.write(tiltServoPosition);  
+//  servoPan.write(panServoPosition);
 
   // compute conversion factor for turning pixels (+, - from center) into degrees based on pixel matrix and FOV of camera
-  degreesPerPixel = FOV / HORIZ_PIXELS;
-  #ifdef DEBUG
+  degreesPerPixel = HORIZ_FOV / HORIZ_PIXELS;
+  #ifdef DEBUG 
+    Serial.println("\n\n\n");
+    Serial.println("*** INITIALIZED ****\n");
     Serial.print("degrees per pixel = ");
     Serial.println(degreesPerPixel);
-    Serial.println("*** INITIALIZED ****\n");
   #endif
+
+  #ifdef DEBUG
+    Serial.print("pan servo position = ");
+    Serial.print(panServoPosition);
+    Serial.print(" ; tilt servo position = ");
+    Serial.print(tiltServoPosition);
+    Serial.println("\n");
+  #endif  
+
+  Serial.println("Platform now centered in field of view.");
+  Serial.print("Input x,y from ");
+  Serial.print(-HORIZ_PIXELS/2);
+  Serial.print(",");
+  Serial.print(-VERT_PIXELS/2); 
+  Serial.print(" to ");
+  Serial.print(HORIZ_PIXELS/2);
+  Serial.print(",");
+  Serial.print(VERT_PIXELS/2); 
+  Serial.print(" will map to a FOV of ");
+  Serial.print(HORIZ_FOV);
+  Serial.print(",");
+  Serial.print(VERT_FOV);
+  Serial.print(" degrees.");
+  Serial.println("");
 
   // flash the onboad LED to signal end of setup()
   
@@ -100,9 +194,10 @@ void setup() {
 
 } // end of setup()
 
+
+// ********************************************
 void loop() {
 
-  int newPanServo, newTiltServo;  // the new positions to move the servos to
   int newX, newY;
 
   // read data from the serial port in the form of x,y where x and y are image coordinates relative to the center of the image
@@ -120,40 +215,14 @@ void loop() {
     Serial.println("\n");
   #endif
 
-  // convert the new X and Y image pixel values to servo angles
-  #ifdef ABSOLUTE_MODE
-    float newXServo = INITIAL_PAN_SERVO + (degreesPerPixel * newX);
-    float newYServo = INITIAL_TILT_SERVO - (degreesPerPixel * newY);
-
-
-  #else   // this would be RELATIVE mode
-    float newXServo = panServoPosition + (degreesPerPixel * newX);
-    float newYServo = tiltServoPosition - (degreesPerPixel * newY);
-
+  #ifdef CALIBRATE
+    Serial.println("CALLIBRATE MODE");
+    servoPan.write(newX);
+    servoTilt.write(newY);
+  #else
+    // normal operation
+    movePanTilt(newX,newY);
   #endif
-
-  // the new servo positions
-  newPanServo = round(newXServo);
-  newTiltServo = round(newYServo);
-
-  // constrain the servo values to be withon 0 - 180 degrees
-  newPanServo = constrain(newPanServo, 0, 180);
-  newTiltServo = constrain(newTiltServo, 0, 180);
-
-  servoPan.write(newPanServo);
-  servoTilt.write(newTiltServo);
-
-  // reset the current servo states
-  panServoPosition = newPanServo;
-  tiltServoPosition = newTiltServo;
-
-  #ifdef DEBUG
-    Serial.print("pan servo position = ");
-    Serial.print(panServoPosition);
-    Serial.print(" ; tilt sevo position = ");
-    Serial.print(tiltServoPosition);
-    Serial.println("\n");
-  #endif  
 
   // flush out the newline from the serial buffer before returning for a new value
   while (Serial.available() > 0) {
