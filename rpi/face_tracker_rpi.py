@@ -14,10 +14,10 @@ import sys
 import serial
 import time
 from gpiozero import AngularServo, Device
-from gpiozero.pins.rpigpio import RPiGPIOFactory
+from gpiozero.pins.pigpio import PiGPIOFactory
 
 # Use RPi.GPIO for PWM
-Device.pin_factory = RPiGPIOFactory()
+Device.pin_factory = PiGPIOFactory()
 
 SERVO_PAN_PIN = 12  # Hardware PWM capable
 SERVO_TILT_PIN = 13  # Hardware PWM capable
