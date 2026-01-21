@@ -258,8 +258,8 @@ class FaceTracker:
         
         # Transform to center-origin coordinate system
         # (0,0) at center of frame, positive X to left, positive Y up
-        poi_x_cam_center_origin = (self.cam_frame_width // 2) + poi_x_cam  
-        poi_y_cam_center_origin = (self.cam_frame_height // 2) - poi_y_cam  # Inverted Y
+        poi_x_cam_center_origin = poi_x_cam - (self.cam_frame_width // 2) 
+        poi_y_cam_center_origin = (poi_y_cam - (self.cam_frame_height // 2)) * -1  # Camera has Inverted Y
         print(f"Centered coordinates: ({poi_x_cam_center_origin}, {poi_y_cam_center_origin})")
         """
         # Scale transformed_x to servo pan range
@@ -299,7 +299,7 @@ class FaceTracker:
         print(f"Clamped servo positions: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
 
         #TESTING
-        self.servoPanPos = 0.0
+        self.servoTiltPos = 0.0
 
 
         print(f"Sent to servos: {self.servoPanPos:.3f}, {self.servoTiltPos:.3f}")
