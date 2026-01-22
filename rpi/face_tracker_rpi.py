@@ -314,7 +314,7 @@ class FaceTracker:
             print(f"Clamped servo positions: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
 
         # TESTING
-        self.servoPanPos = 0.0
+        # self.servoPanPos = 0.0
 
         if DEBUG:
             print(f"Sent to servos: {self.servoPanPos:.3f}, {self.servoTiltPos:.3f}")
