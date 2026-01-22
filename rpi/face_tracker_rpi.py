@@ -8,6 +8,7 @@ Captures video from the laptop camera and tracks faces in real-time.
 2026 01 18 modified to work with Raspberry Pi and GPIOZero servos
 
 """
+DEBUG = False
 
 import cv2
 import sys
@@ -35,8 +36,8 @@ SERVO_TILT_MIN = -0.38
 SERVO_TILT_MAX = 0.38
 INVERT_Y_SERVO = True  # Set to True if up is negative for your servo setup
 
-HORIZONTAL_FOV_CAM = 70.0 
-VERTICAL_FOV_CAM = 22.0 
+HORIZONTAL_FOV_CAM = 25.0 
+VERTICAL_FOV_CAM = 10.0 
 
 # servo setup
 servoPan = AngularServo(SERVO_PAN_PIN, min_pulse_width=0.0006, max_pulse_width=0.0024)
@@ -46,6 +47,8 @@ servoTilt = AngularServo(SERVO_TILT_PIN, min_pulse_width=0.0006, max_pulse_width
 app = Flask(__name__)
 output_frame = None
 lock = threading.Lock()
+streaming_clients = 0
+clients_lock = threading.Lock()
 
 
 class FaceTracker:
@@ -254,13 +257,15 @@ class FaceTracker:
         # Point of Interest (center of the largest face)
         poi_x_cam = x + w // 2
         poi_y_cam = y + h // 2
+
         print(f"Largest face center: ({poi_x_cam}, {poi_y_cam})")
         
         # Transform to center-origin coordinate system
         # (0,0) at center of frame, positive X to left, positive Y up
         poi_x_cam_center_origin = poi_x_cam - (self.cam_frame_width // 2) 
         poi_y_cam_center_origin = (poi_y_cam - (self.cam_frame_height // 2)) * -1  # Camera has Inverted Y
-        print(f"Centered coordinates: ({poi_x_cam_center_origin}, {poi_y_cam_center_origin})")
+        if DEBUG:
+            print(f"Transformed to center origin: ({poi_x_cam_center_origin}, {poi_y_cam_center_origin})")
         """
         # Scale transformed_x to servo pan range
         # Map from [-frame_width/2, frame_width/2] to [SERVO_PAN_MIN, SERVO_PAN_MAX]
@@ -283,27 +288,36 @@ class FaceTracker:
         # scale center origin to servo movement increments in FOV units
         scaled_x = poi_x_cam_center_origin  * (HORIZONTAL_FOV_CAM / self.cam_frame_width)
         scaled_y = poi_y_cam_center_origin  * (VERTICAL_FOV_CAM / self.cam_frame_height)
-        print(f"Scaled to FOV increments: ({scaled_x:.3f}, {scaled_y:.3f})")
+        if DEBUG:
+            print(f"Scaled to FOV increments: ({scaled_x:.3f}, {scaled_y:.3f})")
 
         # convert increments to servo position changes (-1.0 to +1.0)
         scaled_x_servo = scaled_x / self.cam_frame_width
         scaled_y_servo = scaled_y / self.cam_frame_height
-        print(f"Scaled to servo position changes: ({scaled_x_servo:.3f}, {scaled_y_servo:.3f})")
+        if DEBUG:
+            print(f"Scaled to servo position changes: ({scaled_x_servo:.3f}, {scaled_y_servo:.3f})")
 
-        print(f"Current servo positions before update: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
+        if DEBUG:
+            print(f"Current servo positions before update: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
         # Move the position relative to current position
         self.servoPanPos -= scaled_x_servo
         if INVERT_Y_SERVO:
             scaled_y_servo = -scaled_y_servo
         self.servoTiltPos += scaled_y_servo
-        print(f"Updated servo positions before clamp: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
+        if DEBUG:
+            print(f"Updated servo positions before clamp: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
 
         # Clamp to servo limits
         self.servoPanPos = max(-.8, min(.8, self.servoPanPos))
         self.servoTiltPos = max(-.8, min(.8, self.servoTiltPos))   
-        print(f"Clamped servo positions: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
+        if DEBUG:
+            print(f"Clamped servo positions: ({self.servoPanPos:.3f}, {self.servoTiltPos:.3f})")
 
-        print(f"Sent to servos: {self.servoPanPos:.3f}, {self.servoTiltPos:.3f}")
+        # TESTING
+        self.servoPanPos = 0.0
+
+        if DEBUG:
+            print(f"Sent to servos: {self.servoPanPos:.3f}, {self.servoTiltPos:.3f}")
         # Move Servos
         try:
             servoPan.value = self.servoPanPos
@@ -369,6 +383,24 @@ class FaceTracker:
         instructions = "Press 'q' to quit"
         cv2.putText(frame, instructions, (10, frame.shape[0] - 20),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        
+        # Draw center crosshairs
+        height, width = frame.shape[:2]
+        center_x = width // 2
+        center_y = height // 2
+        color = (0, 255, 255)  # Yellow color
+        
+        # Draw vertical dashed line
+        dash_length = 10
+        gap_length = 5
+        for y in range(0, height, dash_length + gap_length):
+            y_end = min(y + dash_length, height)
+            cv2.line(frame, (center_x, y), (center_x, y_end), color, 1)
+        
+        # Draw horizontal dashed line
+        for x in range(0, width, dash_length + gap_length):
+            x_end = min(x + dash_length, width)
+            cv2.line(frame, (x, center_y), (x_end, center_y), color, 1)
     
     def run(self):
         """Run the face tracking loop."""
@@ -412,10 +444,14 @@ class FaceTracker:
                 # Add info overlay
                 self.add_info_overlay(frame, faces, fps)
                 
-                # Store frame for Flask streaming
-                global output_frame, lock
-                with lock:
-                    output_frame = frame.copy()
+                # Store frame for Flask streaming (only if clients are connected)
+                global output_frame, lock, streaming_clients, clients_lock
+                with clients_lock:
+                    has_clients = streaming_clients > 0
+                
+                if has_clients:
+                    with lock:
+                        output_frame = frame.copy()
                 
                 # Check for quit key (non-blocking)
                 key = cv2.waitKey(1) & 0xFF
@@ -464,22 +500,32 @@ def list_available_cameras(max_cameras=32):
 
 def generate_frames():
     """Generate frames for Flask streaming."""
-    global output_frame, lock
+    global output_frame, lock, streaming_clients, clients_lock
     
-    while True:
-        with lock:
-            if output_frame is None:
-                continue
+    # Track this client
+    with clients_lock:
+        streaming_clients += 1
+    
+    try:
+        while True:
+            with lock:
+                if output_frame is None:
+                    continue
+                
+                # Encode frame as JPEG with reduced quality (60% instead of default 95%)
+                encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 60]
+                (flag, encodedImage) = cv2.imencode(".jpg", output_frame, encode_params)
+                
+                if not flag:
+                    continue
             
-            # Encode frame as JPEG
-            (flag, encodedImage) = cv2.imencode(".jpg", output_frame)
-            
-            if not flag:
-                continue
-        
-        # Yield frame in MJPEG format
-        yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
-              bytearray(encodedImage) + b'\r\n')
+            # Yield frame in MJPEG format
+            yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
+                  bytearray(encodedImage) + b'\r\n')
+    finally:
+        # Untrack this client when they disconnect
+        with clients_lock:
+            streaming_clients -= 1
 
 
 @app.route('/')
